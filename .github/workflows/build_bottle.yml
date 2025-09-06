@@ -55,6 +55,20 @@ jobs:
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
 
+          # --- ハイフン `--` を `-` に修正するロジック ---
+          NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
+          if [ "$BOTTLE_FILENAME" != "$NEW_BOTTLE_FILENAME" ]; then
+            echo "--- Renaming bottle file from '$BOTTLE_FILENAME' to '$NEW_BOTTLE_FILENAME' ---"
+            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
+            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
+            
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/--/-/g')
+            mv "$JSON_FILE" "$NEW_JSON_FILE"
+            JSON_FILE=$NEW_JSON_FILE
+
+            jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
+          fi
+
           # --- macOS 13 (ventura) の arm64 ボトルファイル名を修正するロジック ---
           # arm64アーキテクチャなのにファイル名にarm64が含まれていない場合に修正
           if [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
@@ -72,20 +86,6 @@ jobs:
             
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
               '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
-          fi
-
-          # --- ハイフン `--` を `-` に修正するロジック ---
-          NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
-          if [ "$BOTTLE_FILENAME" != "$NEW_BOTTLE_FILENAME" ]; then
-            echo "--- Renaming bottle file from '$BOTTLE_FILENAME' to '$NEW_BOTTLE_FILENAME' ---"
-            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
-            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
-            
-            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/--/-/g')
-            mv "$JSON_FILE" "$NEW_JSON_FILE"
-            JSON_FILE=$NEW_JSON_FILE
-
-            jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
 
           echo "--- DEBUG: JSON file content ---"
