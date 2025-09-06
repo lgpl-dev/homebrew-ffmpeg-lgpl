@@ -22,15 +22,18 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         run: |
-          # bottleを作成し、そのパスを環境変数に保存
-          brew bottle --json --no-rebuild ffmpeg-lgpl > ffmpeg-lgpl.json
+          # brew bottle のログを標準エラー出力にリダイレクトし、JSONのみをファイルに保存
+          brew bottle --json --no-rebuild ffmpeg-lgpl 2> /dev/null > ffmpeg-lgpl.json
+          
           # リリース情報（Formula名とバージョン）を抽出
           BOTTLE_JSON=$(cat ffmpeg-lgpl.json)
           FORMULA_NAME=$(echo "$BOTTLE_JSON" | jq -r '.[].formula.name')
           FORMULA_VERSION=$(echo "$BOTTLE_JSON" | jq -r '.[].formula.pkg_version')
-          
+          BOTTLE_FILENAME=$(echo "$BOTTLE_JSON" | jq -r '.[].bottle.filename')
+
           echo "FORMULA_NAME=$FORMULA_NAME" >> $GITHUB_OUTPUT
           echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
+          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
 
       - name: Create release
         env:
@@ -44,4 +47,4 @@ jobs:
 
           # 作成したリリースにbottleファイルをアップロード
           gh release upload v${{ steps.bottle.outputs.FORMULA_VERSION }} \
-            ffmpeg-lgpl--*.*.*.*.arm64_sonoma.bottle.tar.gz
+            ${{ steps.bottle.outputs.BOTTLE_FILENAME }}
