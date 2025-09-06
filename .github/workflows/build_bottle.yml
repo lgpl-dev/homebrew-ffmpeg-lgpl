@@ -66,7 +66,8 @@ jobs:
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
 
-            jq '.[].bottle.tags[][].local_filename |= sub("--"; "-")' "$JSON_FILE" > temp.json
+            # 修正: jqコマンドのパスを修正
+            jq '.[].bottle.tags[] |= if .local_filename then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json
             mv temp.json "$JSON_FILE"
           fi
           # --- ここまで修正ロジック ---
@@ -75,20 +76,17 @@ jobs:
           if [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
             echo "--- Correcting arm64 bottle file names ---"
             
-            # 元のタグ名を取得
             ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*([a-z0-9_]+)\.bottle\.json/\1/')
             
-            # ボトルファイル名を修正
             NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
             mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
             BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
             
-            # JSONファイル名を修正
             NEW_JSON_FILE=$(echo "$JSON_FILE" | sed "s/\.${ORIGINAL_TAG}\.bottle\.json$/\.arm64_${ORIGINAL_TAG}\.bottle\.json/")
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
             
-            # JSONファイル内のタグを修正
+            # 修正: jqコマンドのパスを修正
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
               '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json
             mv temp.json "$JSON_FILE"
@@ -98,8 +96,8 @@ jobs:
           cat "$JSON_FILE"
           
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
-          echo "BOTTLE_FILENAME=$BOTTLE_OUTPUT_NAME" >> $GITHUB_OUTPUT
-          echo "JSON_FILENAME=$JSON_OUTPUT_NAME" >> $GITHUB_OUTPUT
+          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
+          echo "JSON_FILENAME=$JSON_FILENAME" >> $GITHUB_OUTPUT
           echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
           
       - name: Create or get release
