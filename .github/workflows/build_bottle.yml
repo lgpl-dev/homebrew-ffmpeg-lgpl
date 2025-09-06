@@ -12,7 +12,6 @@ jobs:
       matrix:
         os: [macos-15, macos-14, macos-13]
         arch: [arm64, x86_64]
-        # x86_64はmacOS 15では対応していないため除外
         exclude:
           - os: macos-15
             arch: x86_64
@@ -25,43 +24,49 @@ jobs:
 
       - name: Set up Homebrew and tap
         run: |
-          brew update --auto-update
-          brew tap lgpl-dev/ffmpeg-lgpl
+          # Use 'arch' to run the Homebrew command in the specified architecture environment
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            arch -x86_64 brew update --auto-update
+            arch -x86_64 brew tap lgpl-dev/ffmpeg-lgpl
+          else
+            brew update --auto-update
+            brew tap lgpl-dev/ffmpeg-lgpl
+          fi
 
-      - name: Install formula
-        run: brew install ffmpeg-lgpl --build-bottle --arch=${{ matrix.arch }}
-
-      - name: Build bottle
+      - name: Install formula and build bottle
         id: bottle
         run: |
-          # brew bottleを実行し、JSONファイルとボトルファイルを生成
-          brew bottle --json --no-rebuild ffmpeg-lgpl --arch=${{ matrix.arch }}
+          # Install and build the formula in the correct architecture environment
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            arch -x86_64 brew install ffmpeg-lgpl --build-bottle
+            arch -x86_64 brew bottle --json --no-rebuild ffmpeg-lgpl
+          else
+            brew install ffmpeg-lgpl --build-bottle
+            brew bottle --json --no-rebuild ffmpeg-lgpl
+          fi
           
-          # 生成されたファイル名を特定
+          # Get file names and formula version from the generated JSON
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
 
-          # JSONファイルの内容をデバッグログに出力
+          # Debugging: show JSON content
           echo "--- DEBUG: JSON file content ---"
           cat "$JSON_FILE"
 
-          # 後続のステップで利用できるよう、出力として設定
+          # Set outputs for subsequent steps
+          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
           echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
-          echo "FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")" >> $GITHUB_OUTPUT
+          echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
           
       - name: Create or get release
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # FormulaのバージョンをJSONファイルから取得
           FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
-          
-          # リリースの存在をチェック
           RELEASE_INFO=$(gh release view v"$FORMULA_VERSION" --json url 2>/dev/null || true)
           
-          # リリースが存在しない場合のみ作成
           if [[ -z "$RELEASE_INFO" ]]; then
             gh release create "v$FORMULA_VERSION" \
               --title "ffmpeg-lgpl v$FORMULA_VERSION" \
