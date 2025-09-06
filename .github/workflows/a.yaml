@@ -16,7 +16,26 @@ jobs:
         run: |
           # --- ダミーファイルの作成 ---
           # macOS 13 (ventura) の arm64 ボトルファイルを模倣
-          echo '{"name":"ffmpeg-lgpl"}' > ffmpeg-lgpl--8.0_1.ventura.bottle.json
+          cat << EOF > ffmpeg-lgpl--8.0_1.ventura.bottle.json
+{
+  "lgpl-dev/ffmpeg-lgpl/ffmpeg-lgpl": {
+    "formula": {
+      "name": "ffmpeg-lgpl",
+      "pkg_version": "8.0_1"
+    },
+    "bottle": {
+      "rebuild": 0,
+      "tags": {
+        "ventura": {
+          "filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz",
+          "local_filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz",
+          "sha256": "abcdef1234567890"
+        }
+      }
+    }
+  }
+}
+EOF
           touch ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz
 
           JSON_FILE=$(ls -1 *.json | head -n 1)
@@ -51,7 +70,6 @@ jobs:
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
             
-            # ダミーJSONファイルにタグを追加して修正
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
               '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
@@ -59,6 +77,5 @@ jobs:
           echo "--- FINAL BOTTLE FILENAME: $BOTTLE_FILENAME ---"
           echo "--- FINAL JSON FILENAME: $JSON_FILE ---"
           
-          # 最終結果を出力に設定（デバッグ用）
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
           echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
