@@ -70,11 +70,12 @@ jobs:
           fi
 
           # --- macOS 13 (ventura) の arm64 ボトルファイル名を修正するロジック ---
-          # arm64アーキテクチャなのにファイル名にarm64が含まれていない場合に修正
-          if [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
+          # macOS 13 (ventura) の arm64 ビルドで、ファイル名にarm64が含まれていない場合のみ実行
+          if [ "${{ matrix.os }}" == "macos-13" ] && [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
             echo "--- Correcting arm64 bottle file names ---"
             
-            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*([a-z0-9_]+)\.bottle\.json/\1/')
+            # 修正: sedの正規表現でドットをエスケープ
+            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*\.([a-z0-9_]+)\.bottle\.json/\1/')
             
             NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
             mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
