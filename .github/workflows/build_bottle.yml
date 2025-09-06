@@ -22,13 +22,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Homebrew and tap
+      - name: Set up Homebrew for ${{ matrix.arch }}
         run: |
-          # Use 'arch' to run the Homebrew command in the specified architecture environment
+          # Check the architecture from the matrix
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            # Manually install Homebrew to /usr/local for x86_64 builds
+            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            
+            # Configure Homebrew paths for this step
+            echo "/usr/local/bin" >> $GITHUB_PATH
+            echo "/usr/local/sbin" >> $GITHUB_PATH
+            export HOMEBREW_PREFIX="/usr/local"
+            export HOMEBREW_REPOSITORY="/usr/local/Homebrew"
+            export HOMEBREW_CELLAR="/usr/local/Cellar"
+
             arch -x86_64 brew update --auto-update
             arch -x86_64 brew tap lgpl-dev/ffmpeg-lgpl
           else
+            # Default behavior for arm64 builds
             brew update --auto-update
             brew tap lgpl-dev/ffmpeg-lgpl
           fi
@@ -36,11 +47,12 @@ jobs:
       - name: Install formula and build bottle
         id: bottle
         run: |
-          # Install and build the formula in the correct architecture environment
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            # Use the x86_64 Homebrew installation
             arch -x86_64 brew install ffmpeg-lgpl --build-bottle
             arch -x86_64 brew bottle --json --no-rebuild ffmpeg-lgpl
           else
+            # Use the default arm64 Homebrew installation
             brew install ffmpeg-lgpl --build-bottle
             brew bottle --json --no-rebuild ffmpeg-lgpl
           fi
@@ -49,11 +61,9 @@ jobs:
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
 
-          # Debugging: show JSON content
           echo "--- DEBUG: JSON file content ---"
           cat "$JSON_FILE"
 
-          # Set outputs for subsequent steps
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
           echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
