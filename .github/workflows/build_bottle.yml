@@ -19,10 +19,57 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Check for existing bottle on release
+        id: check_bottle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FORMULA_NAME="ffmpeg-lgpl"
+          
+          # brew infoコマンドの出力からバージョンとリビジョンを正確に取得
+          FORMULA_INFO=$(brew info --json "$FORMULA_NAME")
+          FORMULA_VERSION=$(echo "$FORMULA_INFO" | jq -r '.[0].versions.stable')
+          
+          # リビジョンが0の場合は無視
+          FORMULA_REVISION=$(echo "$FORMULA_INFO" | jq -r '.[0].versions.revision')
+          if [ "$FORMULA_REVISION" == "0" ]; then
+            RELEASE_TAG="v$FORMULA_VERSION"
+          else
+            RELEASE_TAG="v${FORMULA_VERSION}_${FORMULA_REVISION}"
+          fi
+          
+          # ビルドするボトルファイルの予測名を作成
+          # macOS 13 (ventura) の arm64 ボトルは特別な命名規則
+          if [ "${{ matrix.os }}" == "macos-13" ] && [ "${{ matrix.arch }}" == "arm64" ]; then
+            FILE_NAME="${FORMULA_NAME}-${FORMULA_VERSION}_${FORMULA_REVISION}.arm64_ventura.bottle.tar.gz"
+          else
+            # 他のOS/アーキテクチャの組み合わせに対応
+            OS_TAG=$(echo "${{ matrix.os }}" | sed 's/macos-//')
+            ARCH_TAG="${{ matrix.arch }}"
+            FILE_NAME="${FORMULA_NAME}-${FORMULA_VERSION}_${FORMULA_REVISION}.${ARCH_TAG}_${OS_TAG}.bottle.tar.gz"
+          fi
+          
+          # `--` を `-` に修正
+          FILE_NAME=$(echo "$FILE_NAME" | sed 's/--/-/g')
+          echo "Expected file: $FILE_NAME"
+
+          # GitHub CLIを使用して、リリースにファイルが存在するかチェック
+          RELEASE_ASSETS=$(gh release view "$RELEASE_TAG" --json assets 2>/dev/null || true)
+          
+          if [[ "$RELEASE_ASSETS" == *"$FILE_NAME"* ]]; then
+            echo "::set-output name=skip::true"
+            echo "--- Bottle for this configuration already exists. Skipping build and upload. ---"
+          else
+            echo "::set-output name=skip::false"
+            echo "--- Bottle does not exist. Proceeding with build. ---"
+          fi
+
       - name: Checkout repository
+        if: steps.check_bottle.outputs.skip == 'false'
         uses: actions/checkout@v4
 
       - name: Set up Homebrew for ${{ matrix.arch }}
+        if: steps.check_bottle.outputs.skip == 'false'
         run: |
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
             echo "--- Installing Homebrew for x86_64 ---"
@@ -34,6 +81,7 @@ jobs:
           fi
 
       - name: Tap formula
+        if: steps.check_bottle.outputs.skip == 'false'
         run: |
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
             arch -x86_64 brew tap lgpl-dev/ffmpeg-lgpl
@@ -42,6 +90,7 @@ jobs:
           fi
 
       - name: Install formula and build bottle
+        if: steps.check_bottle.outputs.skip == 'false'
         id: bottle
         run: |
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
@@ -70,11 +119,9 @@ jobs:
           fi
 
           # --- macOS 13 (ventura) の arm64 ボトルファイル名を修正するロジック ---
-          # macOS 13 (ventura) の arm64 ビルドで、ファイル名にarm64が含まれていない場合のみ実行
           if [ "${{ matrix.os }}" == "macos-13" ] && [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
             echo "--- Correcting arm64 bottle file names ---"
             
-            # 修正: sedの正規表現でドットをエスケープ
             ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*\.([a-z0-9_]+)\.bottle\.json/\1/')
             
             NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
@@ -88,9 +135,6 @@ jobs:
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
               '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
-
-          echo "--- DEBUG: JSON file content ---"
-          cat "$JSON_FILE"
           
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
@@ -98,26 +142,43 @@ jobs:
           echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
           
       - name: Create or get release
+        if: steps.check_bottle.outputs.skip == 'false'
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
-          RELEASE_INFO=$(gh release view v"$FORMULA_VERSION" --json url 2>/dev/null || true)
+          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "${{ steps.bottle.outputs.JSON_FILENAME }}")
+          
+          # リビジョンが0の場合はvX.Y、それ以外はvX.Y_Zの形式にする
+          if [[ "$FORMULA_VERSION" == *_* ]]; then
+            RELEASE_TAG="v$FORMULA_VERSION"
+          else
+            RELEASE_TAG="v${FORMULA_VERSION}_0"
+          fi
+          
+          RELEASE_INFO=$(gh release view "$RELEASE_TAG" --json url 2>/dev/null || true)
           
           if [[ -z "$RELEASE_INFO" ]]; then
-            gh release create "v$FORMULA_VERSION" \
-              --title "ffmpeg-lgpl v$FORMULA_VERSION" \
+            gh release create "$RELEASE_TAG" \
+              --title "ffmpeg-lgpl v${FORMULA_VERSION}" \
               --notes "New bottles for ffmpeg-lgpl."
           fi
           
       - name: Upload assets to release
+        if: steps.check_bottle.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
+          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "${{ steps.bottle.outputs.JSON_FILENAME }}")
           
-          gh release upload "v$FORMULA_VERSION" \
+          # リビジョンが0の場合はvX.Y、それ以外はvX.Y_Zの形式にする
+          if [[ "$FORMULA_VERSION" == *_* ]]; then
+            RELEASE_TAG="v$FORMULA_VERSION"
+          else
+            RELEASE_TAG="v${FORMULA_VERSION}_0"
+          fi
+          
+          gh release upload "$RELEASE_TAG" \
             "${{ steps.bottle.outputs.BOTTLE_FILENAME }}" \
             "${{ steps.bottle.outputs.JSON_FILENAME }}" \
             --clobber
