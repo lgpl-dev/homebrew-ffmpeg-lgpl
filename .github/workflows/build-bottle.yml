@@ -70,3 +70,4 @@ jobs:
           asset_path: ${{ steps.get_paths.outputs.JSON_PATH }}
           asset_name: ${{ steps.get_paths.outputs.JSON_NAME }}
           asset_content_type: application/json
+
