@@ -22,12 +22,9 @@ jobs:
         id: setup-homebrew
         uses: Homebrew/actions/setup-homebrew@master
       
-      - name: Install dependencies
-        run: brew install aom fontconfig freetype harfbuzz jpeg-xl libass libssh libvmaf libvorbis openjpeg opus tesseract webp xz
-
       - name: Build and upload bottle
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         run: |
-          brew test-bot --only-json-tab --ci-pr-labels=''
+          brew test-bot --only-json-tab
           brew pr-upload --no-pr
