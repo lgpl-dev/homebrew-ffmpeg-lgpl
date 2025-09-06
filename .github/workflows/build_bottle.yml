@@ -12,7 +12,6 @@ jobs:
       matrix:
         os: [macos-15, macos-14, macos-13]
         arch: [arm64, x86_64]
-        # x86_64はmacOS 15では対応していないため除外
         exclude:
           - os: macos-15
             arch: x86_64
@@ -48,6 +47,7 @@ jobs:
           # 後続のステップで利用できるよう、出力として設定
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
           echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
+          echo "FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")" >> $GITHUB_OUTPUT
 
       - name: Create or get release
         id: release
@@ -55,7 +55,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # FormulaのバージョンをJSONファイルから取得
-          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "${{ steps.bottle.outputs.JSON_FILENAME }}")
+          FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
           
           # リリースの存在をチェック
           RELEASE_INFO=$(gh release view v"$FORMULA_VERSION" --json url 2>/dev/null || true)
@@ -71,8 +71,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "${{ steps.bottle.outputs.JSON_FILENAME }}")
+          FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
           
           gh release upload "v$FORMULA_VERSION" \
             "${{ steps.bottle.outputs.BOTTLE_FILENAME }}" \
-            "${{ steps.bottle.outputs.JSON_FILENAME }}"
+            "${{ steps.bottle.outputs.JSON_FILENAME }}" \
+            --clobber
