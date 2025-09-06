@@ -13,30 +13,21 @@ jobs:
   build-bottles:
     runs-on: macos-latest
     steps:
-      - name: Set up Homebrew
-        id: setup-homebrew
-        uses: Homebrew/actions/setup-homebrew@master
-
-      - name: Cache Homebrew
-        id: cache-homebrew
-        uses: Homebrew/actions/cache@master
-
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Set up Homebrew
+        id: setup-homebrew
+        uses: Homebrew/actions/setup-homebrew@v4
+      
       - name: Install dependencies
         run: brew install aom fontconfig freetype harfbuzz jpeg-xl libass libssh libvmaf libvorbis openjpeg opus tesseract webp xz
 
-      - name: Build bottle
-        env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-        run: brew test-bot --only-json-tab --ci-pr-labels=''
-        
-      - name: Upload bottle
+      - name: Build and upload bottle
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         run: |
-          brew tap-new --no-commit --force "${{ github.repository }}"
+          brew test-bot --only-json-tab --ci-pr-labels=''
           brew pr-upload --no-pr
