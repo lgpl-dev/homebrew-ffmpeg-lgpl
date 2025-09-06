@@ -16,26 +16,25 @@ jobs:
         run: |
           # --- ダミーファイルの作成 ---
           # macOS 13 (ventura) の arm64 ボトルファイルを模倣
+          # jqが処理できるように、より正確な構造のダミーJSONを作成
           cat << EOF > ffmpeg-lgpl--8.0_1.ventura.bottle.json
 {
   "lgpl-dev/ffmpeg-lgpl/ffmpeg-lgpl": {
-    "formula": {
-      "name": "ffmpeg-lgpl",
-      "pkg_version": "8.0_1"
-    },
+    "formula": { "name": "ffmpeg-lgpl" },
     "bottle": {
-      "rebuild": 0,
+      "root_url": "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1",
       "tags": {
         "ventura": {
           "filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz",
           "local_filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz",
-          "sha256": "abcdef1234567890"
+          "sha256": "dummy_sha256"
         }
       }
     }
   }
 }
 EOF
+          
           touch ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz
 
           JSON_FILE=$(ls -1 *.json | head -n 1)
@@ -56,7 +55,6 @@ EOF
           fi
 
           # --- macOS 13 (ventura) の arm64 ボトルファイル名を修正するロジック ---
-          # ${{ matrix.os }} と ${{ matrix.arch }} はこのジョブでは使えないので、直接条件を指定
           if [[ "$BOTTLE_FILENAME" =~ ventura ]] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
             echo "--- Correcting arm64 bottle file names ---"
             
