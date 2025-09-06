@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # リリースを作成・編集する権限を付与
+  contents: write
 
 jobs:
   build-and-release:
@@ -33,9 +33,9 @@ jobs:
           echo "--- DEBUG: JSON file content ---"
           cat "$JSON_FILE"
 
-          # JSONからバージョンとファイル名を抽出
+          # JSONからバージョンとローカルファイル名を抽出
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
-          BOTTLE_FILENAME=$(jq -r '.[].bottle.filename' "$JSON_FILE")
+          BOTTLE_FILENAME=$(jq -r '.[].bottle.tags.arm64_sequoia.local_filename' "$JSON_FILE")
 
           # 後続のステップで利用できるよう、出力として設定
           echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
