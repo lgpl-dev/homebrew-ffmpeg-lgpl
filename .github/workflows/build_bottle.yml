@@ -30,17 +30,17 @@ jobs:
           FORMULA_NAME="ffmpeg-lgpl"
           FORMULA_FILE="ffmpeg-lgpl.rb"
           
-          # フォーミュラファイルからバージョン情報を直接取得
-          FORMULA_VERSION=$(grep -E '^\s*version\s+"[^"]+"' "$FORMULA_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
+          # 正しいバージョン抽出ロジック（URLから抽出）
+          FORMULA_VERSION=$(grep 'url' "$FORMULA_FILE" | grep -o 'ffmpeg-.*\.tar\.[gx]z' | sed 's/ffmpeg-//' | sed 's/\.tar\..*//')
           
-          # リビジョンは存在しない場合があるため、行頭からのマッチングを厳密に
-          FORMULA_REVISION=$(grep -E '^\s*revision\s+[0-9]+' "$FORMULA_FILE" | sed -E 's/.*revision\s+([0-9]+)/\1/')
+          # 正しいリビジョン抽出ロジック
+          FORMULA_REVISION=$(grep -E '^\s*revision\s+' "$FORMULA_FILE" | awk '{print $2}')
           
           # リビジョンが取得できない場合は0と見なす
           if [[ -z "$FORMULA_REVISION" ]]; then
             FORMULA_REVISION="0"
           fi
-
+          
           if [ "$FORMULA_REVISION" == "0" ]; then
             RELEASE_TAG="v$FORMULA_VERSION"
           else
