@@ -16,8 +16,8 @@ jobs:
           FORMULA_NAME="ffmpeg-lgpl"
           FORMULA_FILE="ffmpeg-lgpl.rb"
           
-          # 修正したバージョン抽出ロジック（単一のawkコマンドを使用）
-          FORMULA_VERSION=$(awk '/^\s*version\s+/' "$FORMULA_FILE" | awk '{print $2}' | tr -d '"')
+          # 修正したバージョン抽出ロジック（url行から抽出）
+          FORMULA_VERSION=$(grep 'url' "$FORMULA_FILE" | grep -o 'ffmpeg-.*\.tar\.[gx]z' | sed 's/ffmpeg-//' | sed 's/\.tar\..*//')
           
           # 修正したリビジョン抽出ロジック
           FORMULA_REVISION=$(grep -E '^\s*revision\s+' "$FORMULA_FILE" | awk '{print $2}')
