@@ -17,7 +17,7 @@ jobs:
           brew tap lgpl-dev/ffmpeg-lgpl
 
       - name: Install formula
-        run: brew install ffmpeg-lgpl
+        run: brew install ffmpeg-lgpl --build-bottle
 
       - name: Build and bottle formula
         env:
