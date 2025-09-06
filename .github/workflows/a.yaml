@@ -1,94 +1,45 @@
-name: "Test Bottle Logic"
+name: "Version Extraction Debug"
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
-    runs-on: macos-13
+  debug:
+    runs-on: macos-14
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create mock files and test logic
-        id: test_logic
+      - name: Run debug script
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # --- ダミーファイルの作成 ---
-          cat > ffmpeg-lgpl--8.0_1.ventura.bottle.json << EOF
-          {
-            "lgpl-dev/ffmpeg-lgpl/ffmpeg-lgpl": {
-              "formula": {},
-              "bottle": {
-                "tags": {
-                  "ventura": {
-                    "local_filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz"
-                  }
-                }
-              }
-            }
-          }
-          EOF
-
-          touch ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz
-
-          JSON_FILE=$(ls -1 *.json | head -n 1)
-          BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
+          FORMULA_NAME="ffmpeg-lgpl"
+          FORMULA_FILE="ffmpeg-lgpl.rb"
           
-          echo "--- 1. Initial State ---"
-          echo "BOTTLE_FILENAME: $BOTTLE_FILENAME"
-          echo "JSON_FILE: $JSON_FILE"
-          echo "JSON Content:"
-          cat "$JSON_FILE"
+          # バージョンとリビジョンを抽出するロジック
+          FORMULA_VERSION=$(grep -E '^\s*version\s+"[^"]+"' "$FORMULA_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
+          FORMULA_REVISION=$(grep -E '^\s*revision\s+[0-9]+' "$FORMULA_FILE" | sed -E 's/.*revision\s+([0-9]+)/\1/')
           
-          # --- ハイフン `--` を `-` に修正するロジック ---
-          NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
-          if [ "$BOTTLE_FILENAME" != "$NEW_BOTTLE_FILENAME" ]; then
-            echo "--- 2. Renaming bottle file ---"
-            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
-            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
-            
-            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/--/-/g')
-            mv "$JSON_FILE" "$NEW_JSON_FILE"
-            JSON_FILE=$NEW_JSON_FILE
-
-            jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
-            
-            echo "BOTTLE_FILENAME after rename: $BOTTLE_FILENAME"
-            echo "JSON_FILE after rename: $JSON_FILE"
-            echo "JSON Content after rename:"
-            cat "$JSON_FILE"
+          if [[ -z "$FORMULA_REVISION" ]]; then
+            FORMULA_REVISION="0"
           fi
-
-          # --- macOS 13 (ventura) の arm64 ボトルファイル名を修正するロジック ---
-          if [[ "$BOTTLE_FILENAME" =~ ventura ]] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
-            echo "--- 3. Correcting arm64 file names ---"
-            
-            # 修正: sedの正規表現でドットをエスケープ
-            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*\.([a-z0-9_]+)\.bottle\.json/\1/')
-            echo "ORIGINAL_TAG: $ORIGINAL_TAG"
-            
-            NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
-            echo "NEW_BOTTLE_FILENAME: $NEW_BOTTLE_FILENAME"
-            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
-            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
-            
-            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed "s/\.${ORIGINAL_TAG}\.bottle\.json$/\.arm64_${ORIGINAL_TAG}\.bottle\.json/")
-            echo "NEW_JSON_FILE: $NEW_JSON_FILE"
-            mv "$JSON_FILE" "$NEW_JSON_FILE"
-            JSON_FILE=$NEW_JSON_FILE
-            
-            jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
-              '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
-            
-            echo "BOTTLE_FILENAME after arm64 fix: $BOTTLE_FILENAME"
-            echo "JSON_FILE after arm64 fix: $JSON_FILE"
-            echo "JSON Content after arm64 fix:"
-            cat "$JSON_FILE"
+          
+          if [ "$FORMULA_REVISION" == "0" ]; then
+            RELEASE_TAG="v$FORMULA_VERSION"
+          else
+            RELEASE_TAG="v${FORMULA_VERSION}_${FORMULA_REVISION}"
           fi
-
-          echo "--- 4. Final State ---"
-          echo "FINAL BOTTLE FILENAME: $BOTTLE_FILENAME"
-          echo "FINAL JSON FILENAME: $JSON_FILE"
-          echo "FINAL JSON content:"
-          cat "$JSON_FILE"
+          
+          OS_TAG="sonoma" # macOS-14のシミュレーション
+          ARCH_TAG="arm64"
+          
+          FILE_NAME="${FORMULA_NAME}-${FORMULA_VERSION}_${FORMULA_REVISION}.${ARCH_TAG}_${OS_TAG}.bottle.tar.gz"
+          
+          FILE_NAME=$(echo "$FILE_NAME" | sed 's/--/-/g')
+          
+          echo "FORMULA_VERSION: $FORMULA_VERSION"
+          echo "FORMULA_REVISION: $FORMULA_REVISION"
+          echo "RELEASE_TAG: $RELEASE_TAG"
+          echo "FILE_NAME: $FILE_NAME"
