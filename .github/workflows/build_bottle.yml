@@ -3,6 +3,9 @@ name: "Release Bottles"
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write # リリースを作成・編集する権限を付与
+
 jobs:
   build-and-release:
     runs-on: macos-latest
@@ -21,21 +24,14 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         run: |
-          # bottleを生成
           brew bottle --json --no-rebuild ffmpeg-lgpl
-          # 生成されたJSONデータをログに出力してデバッグ
-          echo "--- DEBUG: brew bottle --json output ---"
-          brew bottle --json --no-rebuild ffmpeg-lgpl
-
+          
       - name: Create release and upload bottle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 最終的なbottleのファイル名を特定する
           BOTTLE_FILE=$(ls ffmpeg-lgpl--*.bottle.tar.gz)
-          
-          # リリース名とタグを取得（ここでは仮のバージョンを使用）
-          RELEASE_VERSION="8.0" # Formulaのバージョンに合わせて手動で設定してください
+          RELEASE_VERSION="8.0_1" # Formulaのバージョンとリビジョンを正確に指定
           
           # gh CLI を使用してGitHub Releasesを作成
           gh release create v$RELEASE_VERSION \
