@@ -1,0 +1,64 @@
+name: "Test Bottle Logic"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create mock files and test logic
+        id: test_logic
+        run: |
+          # --- ダミーファイルの作成 ---
+          # macOS 13 (ventura) の arm64 ボトルファイルを模倣
+          echo '{"name":"ffmpeg-lgpl"}' > ffmpeg-lgpl--8.0_1.ventura.bottle.json
+          touch ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz
+
+          JSON_FILE=$(ls -1 *.json | head -n 1)
+          BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
+
+          # --- ハイフン `--` を `-` に修正するロジック ---
+          NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
+          if [ "$BOTTLE_FILENAME" != "$NEW_BOTTLE_FILENAME" ]; then
+            echo "--- Renaming bottle file from '$BOTTLE_FILENAME' to '$NEW_BOTTLE_FILENAME' ---"
+            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
+            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
+            
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/--/-/g')
+            mv "$JSON_FILE" "$NEW_JSON_FILE"
+            JSON_FILE=$NEW_JSON_FILE
+
+            jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
+          fi
+
+          # --- macOS 13 (ventura) の arm64 ボトルファイル名を修正するロジック ---
+          # ${{ matrix.os }} と ${{ matrix.arch }} はこのジョブでは使えないので、直接条件を指定
+          if [[ "$BOTTLE_FILENAME" =~ ventura ]] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
+            echo "--- Correcting arm64 bottle file names ---"
+            
+            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*([a-z0-9_]+)\.bottle\.json/\1/')
+            
+            NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
+            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
+            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
+            
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed "s/\.${ORIGINAL_TAG}\.bottle\.json$/\.arm64_${ORIGINAL_TAG}\.bottle\.json/")
+            mv "$JSON_FILE" "$NEW_JSON_FILE"
+            JSON_FILE=$NEW_JSON_FILE
+            
+            # ダミーJSONファイルにタグを追加して修正
+            jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
+              '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
+          fi
+
+          echo "--- FINAL BOTTLE FILENAME: $BOTTLE_FILENAME ---"
+          echo "--- FINAL JSON FILENAME: $JSON_FILE ---"
+          
+          # 最終結果を出力に設定（デバッグ用）
+          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
+          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
