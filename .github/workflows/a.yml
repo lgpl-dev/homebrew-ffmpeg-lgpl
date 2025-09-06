@@ -1,0 +1,23 @@
+name: Build and Release Bottle
+
+on:
+workflow_dispatch:
+
+jobs:
+build-and-release:
+runs-on: macos-latest
+
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Setup Homebrew
+    uses: Homebrew/actions/setup-homebrew@master
+
+  - name: Create and upload bottle PR
+    uses: Homebrew/actions/create-and-upload-bottle-pr@master
+    with:
+      formula: ffmpeg-lgpl
+      homebrew_tap: ${{ github.repository }}
+      github_token: ${{ secrets.HOMEBREW_TOKEN }}
+      commit_message: "ffmpeg-lgpl: bottle for macOS"
