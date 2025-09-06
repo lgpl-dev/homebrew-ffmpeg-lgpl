@@ -62,21 +62,16 @@ jobs:
             
             ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*([a-z0-9_]+)\.bottle\.json/\1/')
             
-            # ボトルファイル名を修正
             NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
             mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
             BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
             
-            # JSONファイル名を修正
             NEW_JSON_FILE=$(echo "$JSON_FILE" | sed "s/\.${ORIGINAL_TAG}\.bottle\.json$/\.arm64_${ORIGINAL_TAG}\.bottle\.json/")
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
             
-            # JSONファイル内のタグを修正
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
-              '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json
-            mv temp.json "$JSON_FILE"
-            rm temp.json
+              '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
 
           # --- ハイフン `--` を `-` に修正するロジック ---
@@ -90,11 +85,7 @@ jobs:
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
 
-            # 修正: jqコマンドのパスを修正
-            # .local_filename が見つからないケースに対応
-            jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json
-            mv temp.json "$JSON_FILE"
-            rm temp.json
+            jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
 
           echo "--- DEBUG: JSON file content ---"
