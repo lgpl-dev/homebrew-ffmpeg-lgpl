@@ -24,24 +24,23 @@ jobs:
 
       - name: Set up Homebrew for ${{ matrix.arch }}
         run: |
-          # Check the architecture from the matrix
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
-            # Manually install Homebrew to /usr/local for x86_64 builds
+            echo "--- Installing Homebrew for x86_64 ---"
+            # /usr/local/bin/brew を使うようにPATHを明示的に設定
+            export PATH="/usr/local/bin:$PATH"
             arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            
-            # Configure Homebrew paths for this step
             echo "/usr/local/bin" >> $GITHUB_PATH
-            echo "/usr/local/sbin" >> $GITHUB_PATH
-            export HOMEBREW_PREFIX="/usr/local"
-            export HOMEBREW_REPOSITORY="/usr/local/Homebrew"
-            export HOMEBREW_CELLAR="/usr/local/Cellar"
+          else
+            echo "--- Using default Homebrew for arm64 ---"
+          fi
 
-            # 修正: x86_64環境でupdateとtapを正しく実行
-            arch -x86_64 brew update --auto-update
+      - name: Tap formula
+        run: |
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            # x86_64の環境でHomebrewを使い、タップする
             arch -x86_64 brew tap lgpl-dev/ffmpeg-lgpl
           else
-            # Default behavior for arm64 builds
-            brew update --auto-update
+            # arm64の環境でHomebrewを使い、タップする
             brew tap lgpl-dev/ffmpeg-lgpl
           fi
 
@@ -49,16 +48,15 @@ jobs:
         id: bottle
         run: |
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
-            # Use the x86_64 Homebrew installation
+            # x86_64の環境でインストールとボトル化を実行
             arch -x86_64 brew install ffmpeg-lgpl --build-bottle
             arch -x86_64 brew bottle --json --no-rebuild ffmpeg-lgpl
           else
-            # Use the default arm64 Homebrew installation
+            # arm64の環境でインストールとボトル化を実行
             brew install ffmpeg-lgpl --build-bottle
             brew bottle --json --no-rebuild ffmpeg-lgpl
           fi
           
-          # Get file names and formula version from the generated JSON
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
 
