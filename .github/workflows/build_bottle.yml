@@ -3,7 +3,130 @@ name: "Release Bottles"
 on:
   workflow_dispatch:
 
+permissions:name: "Release Bottles"
+
+on:
+  workflow_dispatch:
+
 permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        os: [macos-15, macos-14, macos-13]
+        arch: [arm64, x86_64]
+        exclude:
+          - os: macos-15
+            arch: x86_64
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew for ${{ matrix.arch }}
+        run: |
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            echo "--- Installing Homebrew for x86_64 ---"
+            export PATH="/usr/local/bin:$PATH"
+            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            echo "/usr/local/bin" >> $GITHUB_PATH
+          else
+            echo "--- Using default Homebrew for arm64 ---"
+          fi
+
+      - name: Tap formula
+        run: |
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            arch -x86_64 brew tap lgpl-dev/ffmpeg-lgpl
+          else
+            brew tap lgpl-dev/ffmpeg-lgpl
+          fi
+
+      - name: Install formula and build bottle
+        id: bottle
+        run: |
+          if [ "${{ matrix.arch }}" == "x86_64" ]; then
+            arch -x86_64 brew install ffmpeg-lgpl --build-bottle
+            arch -x86_64 brew bottle --json --no-rebuild ffmpeg-lgpl
+          else
+            brew install ffmpeg-lgpl --build-bottle
+            brew bottle --json --no-rebuild ffmpeg-lgpl
+          fi
+          
+          JSON_FILE=$(ls -1 *.json | head -n 1)
+          BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
+
+          # --- ハイフン `--` を修正するロジック ---
+          NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
+          if [ "$BOTTLE_FILENAME" != "$NEW_BOTTLE_FILENAME" ]; then
+            echo "--- Renaming bottle file from '$BOTTLE_FILENAME' to '$NEW_BOTTLE_FILENAME' ---"
+            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
+            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
+            
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/--/-/g')
+            mv "$JSON_FILE" "$NEW_JSON_FILE"
+            JSON_FILE=$NEW_JSON_FILE
+
+            jq '.[].bottle.tags[] |= if .local_filename then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json
+            mv temp.json "$JSON_FILE"
+          fi
+          # --- ここまで修正ロジック ---
+
+          # ファイル名にarm64が含まれていない場合に修正
+          if [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
+            echo "--- Correcting arm64 bottle file names ---"
+            
+            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*([a-z0-9_]+)\.bottle\.json/\1/')
+            
+            NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
+            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
+            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
+            
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed "s/\.${ORIGINAL_TAG}\.bottle\.json$/\.arm64_${ORIGINAL_TAG}\.bottle\.json/")
+            mv "$JSON_FILE" "$NEW_JSON_FILE"
+            JSON_FILE=$NEW_JSON_FILE
+            
+            jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
+              '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json
+            mv temp.json "$JSON_FILE"
+          fi
+
+          echo "--- DEBUG: JSON file content ---"
+          cat "$JSON_FILE"
+          
+          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
+          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
+          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
+          echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
+          
+      - name: Create or get release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
+          RELEASE_INFO=$(gh release view v"$FORMULA_VERSION" --json url 2>/dev/null || true)
+          
+          if [[ -z "$RELEASE_INFO" ]]; then
+            gh release create "v$FORMULA_VERSION" \
+              --title "ffmpeg-lgpl v$FORMULA_VERSION" \
+              --notes "New bottles for ffmpeg-lgpl."
+          fi
+          
+      - name: Upload assets to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
+          
+          gh release upload "v$FORMULA_VERSION" \
+            "${{ steps.bottle.outputs.BOTTLE_FILENAME }}" \
+            "${{ steps.bottle.outputs.JSON_FILENAME }}" \
+            --clobber
   contents: write
 
 jobs:
