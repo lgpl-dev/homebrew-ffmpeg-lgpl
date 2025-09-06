@@ -26,7 +26,6 @@ jobs:
         run: |
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
             echo "--- Installing Homebrew for x86_64 ---"
-            # /usr/local/bin/brew を使うようにPATHを明示的に設定
             export PATH="/usr/local/bin:$PATH"
             arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
             echo "/usr/local/bin" >> $GITHUB_PATH
@@ -37,10 +36,8 @@ jobs:
       - name: Tap formula
         run: |
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
-            # x86_64の環境でHomebrewを使い、タップする
             arch -x86_64 brew tap lgpl-dev/ffmpeg-lgpl
           else
-            # arm64の環境でHomebrewを使い、タップする
             brew tap lgpl-dev/ffmpeg-lgpl
           fi
 
@@ -48,11 +45,9 @@ jobs:
         id: bottle
         run: |
           if [ "${{ matrix.arch }}" == "x86_64" ]; then
-            # x86_64の環境でインストールとボトル化を実行
             arch -x86_64 brew install ffmpeg-lgpl --build-bottle
             arch -x86_64 brew bottle --json --no-rebuild ffmpeg-lgpl
           else
-            # arm64の環境でインストールとボトル化を実行
             brew install ffmpeg-lgpl --build-bottle
             brew bottle --json --no-rebuild ffmpeg-lgpl
           fi
@@ -60,9 +55,30 @@ jobs:
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
 
+          # arm64アーキテクチャなのにファイル名にarm64が含まれていない場合に修正
+          if [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
+            echo "--- Correcting arm64 bottle file names ---"
+            
+            # ボトルファイル名を修正
+            NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/\.bottle\.tar\.gz$/\.arm64_ventura\.bottle\.tar\.gz/')
+            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
+            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
+            
+            # JSONファイル名を修正
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/\.bottle\.json$/\.arm64_ventura\.bottle\.json/')
+            mv "$JSON_FILE" "$NEW_JSON_FILE"
+            JSON_FILE=$NEW_JSON_FILE
+            
+            # JSONファイル内のURLとタグも修正
+            jq '.[] |= .bottle.tags.arm64_ventura = (.bottle.tags | .[] | .)' "$JSON_FILE" > temp.json
+            jq '.[].bottle.tags.arm64_ventura.local_filename = "'"$NEW_BOTTLE_FILENAME"'"' temp.json > temp2.json
+            mv temp2.json "$JSON_FILE"
+            rm temp.json
+          fi
+
           echo "--- DEBUG: JSON file content ---"
           cat "$JSON_FILE"
-
+          
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
           echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
@@ -84,7 +100,7 @@ jobs:
           
       - name: Upload assets to release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.Secrets.GITHUB_TOKEN }}
         run: |
           FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
           
