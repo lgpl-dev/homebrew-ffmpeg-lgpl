@@ -16,11 +16,6 @@ class FfmpegLgpl < Formula
   # ここにbottleブロックを追加
   bottle do
     root_url "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1"
-    sha256 arm64_sequoia: "902430338339abf0ae82a60268e5c5fae4ab623f01d1050b3eec8773fa928d91"
-  end
-
-  bottle do
-    root_url "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1"
     sha256 arm64_sequoia: "735087ec72844bddc3ee90346072bb507c91609a6b187c26e73579adeca4d592"    
     sha256 arm64_sonoma:  "5d02281bf8260649eb927b0dea6167bb9c395e8a0afe371ebfc8f4d566a38887"
     sha256 arm64_ventura: "9f01c8ade6eec6cdcc8bea4deeec0fae442efefa6d5f98f49431f49273199f80"
