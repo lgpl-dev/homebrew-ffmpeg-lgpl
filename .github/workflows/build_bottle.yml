@@ -20,23 +20,37 @@ jobs:
           brew tap lgpl-dev/ffmpeg-lgpl
           brew install ffmpeg-lgpl --build-bottle
 
-      - name: Build and bottle formula
-        env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+      - name: Build bottle and get info
+        id: bottle
         run: |
+          # brew bottle を実行し、JSONファイルが自動生成される
           brew bottle --json --no-rebuild ffmpeg-lgpl
-          
+
+          # 生成されたJSONファイルの名前を特定
+          JSON_FILE=$(ls -1 *.json | head -n 1)
+
+          # デバッグ用にJSONファイルの内容をログに出力
+          echo "--- DEBUG: JSON file content ---"
+          cat "$JSON_FILE"
+
+          # JSONからバージョンとファイル名を抽出
+          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
+          BOTTLE_FILENAME=$(jq -r '.[].bottle.filename' "$JSON_FILE")
+
+          # 後続のステップで利用できるよう、出力として設定
+          echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
+          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
+
       - name: Create release and upload bottle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BOTTLE_FILE=$(ls ffmpeg-lgpl--*.bottle.tar.gz)
-          RELEASE_VERSION="8.0_1" # Formulaのバージョンとリビジョンを正確に指定
-          
           # gh CLI を使用してGitHub Releasesを作成
-          gh release create v$RELEASE_VERSION \
-            --title "ffmpeg-lgpl v$RELEASE_VERSION" \
+          # バージョン情報には前のステップの出力を使用
+          gh release create v${{ steps.bottle.outputs.FORMULA_VERSION }} \
+            --title "ffmpeg-lgpl v${{ steps.bottle.outputs.FORMULA_VERSION }}" \
             --notes "New bottle for ffmpeg-lgpl."
           
           # 作成したリリースにbottleファイルをアップロード
-          gh release upload v$RELEASE_VERSION "$BOTTLE_FILE"
+          gh release upload v${{ steps.bottle.outputs.FORMULA_VERSION }} \
+            "${{ steps.bottle.outputs.BOTTLE_FILENAME }}"
