@@ -1,23 +1,34 @@
-name: Build and Release Bottle
+name: "Release Bottles"
 
+# ワークフローを手動で起動できるように設定
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
-build-and-release:
-runs-on: macos-latest
+  build-and-release:
+    runs-on: macos-latest # macOS環境で実行
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Setup Homebrew
-    uses: Homebrew/actions/setup-homebrew@master
+      - name: Set up Homebrew
+        run: |
+          # Homebrewの最新化
+          brew update --auto-update
+          
+          # Homebrew Tapの追加
+          brew tap homebrew/cask
 
-  - name: Create and upload bottle PR
-    uses: Homebrew/actions/create-and-upload-bottle-pr@master
-    with:
-      formula: ffmpeg-lgpl
-      homebrew_tap: ${{ github.repository }}
-      github_token: ${{ secrets.HOMEBREW_TOKEN }}
-      commit_message: "ffmpeg-lgpl: bottle for macOS"
+      - name: Build and bottle formula
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        run: |
+          # tapをリポジトリに追加
+          brew tap "$GITHUB_REPOSITORY"
+
+          # bottleの作成
+          brew bottle --force --json --no-rebuild ffmpeg-lgpl.rb
+
+          # リリース
+          brew release-pr --bottle --no-browse ffmpeg-lgpl.json
