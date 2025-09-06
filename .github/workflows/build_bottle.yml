@@ -1,0 +1,42 @@
+name: "Release Bottles"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew, tap, and install formula
+        run: |
+          brew update --auto-update
+          brew tap lgpl-dev/ffmpeg-lgpl
+          brew install ffmpeg-lgpl --build-bottle
+
+      - name: Build and bottle formula
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        run: brew bottle --json --no-rebuild ffmpeg-lgpl
+
+      - name: Debug: List generated files
+        run: |
+          echo "Generated files in the current directory:"
+          ls -l
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # gh CLI を使用してGitHub Releasesを作成
+          # リリースのタグ、名前、ボディは静的に設定
+          gh release create v8.0_1 \
+            --title "ffmpeg-lgpl v8.0_1" \
+            --notes "New bottle for ffmpeg-lgpl."
+
+          # 生成されたbottleファイルをリリースにアップロード
+          gh release upload v8.0_1 \
+            ffmpeg-lgpl--8.0_1.arm64_sonoma.bottle.tar.gz
