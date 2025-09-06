@@ -1,0 +1,73 @@
+name: Build and Upload Bottle
+
+on:
+  workflow_dispatch:
+    inputs:
+      formula_name:
+        description: 'Formula to bottle (e.g., ffmpeg-lgpl)'
+        required: true
+        type: string
+
+jobs:
+  build_and_upload_bottle:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Homebrew
+        id: setup-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Build bottle
+        run: |
+          brew bottle --json --no-rebuild ${{ github.event.inputs.formula_name }}
+
+      - name: Find bottle and JSON files
+        id: find_files
+        run: |
+          BOTTLE_FILE=$(find . -name "*.bottle.tar.gz")
+          JSON_FILE=$(find . -name "*.json")
+          echo "::set-output name=bottle_path::$BOTTLE_FILE"
+          echo "::set-output name=json_path::$JSON_FILE"
+          echo "::set-output name=bottle_name::$(basename $BOTTLE_FILE)"
+          echo "::set-output name=json_name::$(basename $JSON_FILE)"
+          
+      - name: Get Release URL
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }} Bottles
+          body: This is a manual bottle upload.
+          draft: false
+          prerelease: false
+
+      - name: Upload bottle to release
+        id: upload_bottle_asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_files.outputs.bottle_path }}
+          asset_name: ${{ steps.find_files.outputs.bottle_name }}
+          asset_content_type: application/gzip
+      
+      - name: Upload JSON to release
+        id: upload_json_asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_files.outputs.json_path }}
+          asset_name: ${{ steps.find_files.outputs.json_name }}
+          asset_content_type: application/json
