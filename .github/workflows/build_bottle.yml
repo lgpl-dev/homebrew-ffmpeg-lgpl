@@ -1,54 +1,19 @@
-name: "Release Bottles"
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: write # リリースを作成・編集する権限を付与
-
-jobs:
-  build-and-release:
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Homebrew, tap, and install formula
-        run: |
-          brew update --auto-update
-          brew tap lgpl-dev/ffmpeg-lgpl
-          brew install ffmpeg-lgpl --build-bottle
-
-      - name: Build bottle and get info
+- name: Build bottle and get info
         id: bottle
         run: |
-          # bottleを生成し、JSONファイルも自動生成される
+          # brew bottle を実行し、JSONファイルとボトルファイルが自動生成される
           brew bottle --json --no-rebuild ffmpeg-lgpl
 
           # 生成されたJSONファイルの名前を特定
           JSON_FILE=$(ls -1 *.json | head -n 1)
-
-          # JSONからバージョンとファイル名を抽出
-          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
-          BOTTLE_FILENAME=$(jq -r '.[].bottle.tags.arm64_sequoia.local_filename' "$JSON_FILE")
           
+          # 生成されたボトルファイルの名前を特定
+          BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
+
+          # JSONからバージョンを抽出
+          FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
+
           # 後続のステップで利用できるよう、出力として設定
           echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
-          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT # JSONファイル名も出力に追加
-
-      - name: Create release and upload assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # gh CLI を使用してGitHub Releasesを作成
-          # バージョン情報には前のステップの出力を使用
-          gh release create v${{ steps.bottle.outputs.FORMULA_VERSION }} \
-            --title "ffmpeg-lgpl v${{ steps.bottle.outputs.FORMULA_VERSION }}" \
-            --notes "New bottle for ffmpeg-lgpl."
-          
-          # 作成したリリースにbottleファイルとJSONファイルをアップロード
-          gh release upload v${{ steps.bottle.outputs.FORMULA_VERSION }} \
-            "${{ steps.bottle.outputs.BOTTLE_FILENAME }}" \
-            "${{ steps.bottle.outputs.JSON_FILENAME }}"
+          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
