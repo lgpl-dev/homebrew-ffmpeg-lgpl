@@ -15,30 +15,29 @@ jobs:
         id: test_logic
         run: |
           # --- ダミーファイルの作成 ---
-          # macOS 13 (ventura) の arm64 ボトルファイルを模倣
-          # jqが処理できるように、より正確な構造のダミーJSONを作成
-          cat << EOF > ffmpeg-lgpl--8.0_1.ventura.bottle.json
-{
-  "lgpl-dev/ffmpeg-lgpl/ffmpeg-lgpl": {
-    "formula": { "name": "ffmpeg-lgpl" },
-    "bottle": {
-      "root_url": "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1",
-      "tags": {
-        "ventura": {
-          "filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz",
-          "local_filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz",
-          "sha256": "dummy_sha256"
-        }
-      }
-    }
-  }
-}
-EOF
-          
+          # 実際のボトルJSONファイルに近い構造でダミーファイルを作成
+          cat > ffmpeg-lgpl--8.0_1.ventura.bottle.json << EOF
+          {
+            "lgpl-dev/ffmpeg-lgpl/ffmpeg-lgpl": {
+              "formula": {},
+              "bottle": {
+                "tags": {
+                  "ventura": {
+                    "local_filename": "ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz"
+                  }
+                }
+              }
+            }
+          }
+          EOF
+
           touch ffmpeg-lgpl--8.0_1.ventura.bottle.tar.gz
 
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
+          
+          echo "--- Initial JSON file content ---"
+          cat "$JSON_FILE"
 
           # --- ハイフン `--` を `-` に修正するロジック ---
           NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
@@ -51,6 +50,7 @@ EOF
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
 
+            # jqコマンドの実行。エラーを無視せず、成功したときのみmv
             jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
 
@@ -68,12 +68,12 @@ EOF
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
             
+            # jqコマンドの実行。成功したときのみmv
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
               '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
 
           echo "--- FINAL BOTTLE FILENAME: $BOTTLE_FILENAME ---"
           echo "--- FINAL JSON FILENAME: $JSON_FILE ---"
-          
-          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
-          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
+          echo "--- FINAL JSON content ---"
+          cat "$JSON_FILE"
