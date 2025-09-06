@@ -100,7 +100,7 @@ jobs:
           
       - name: Upload assets to release
         env:
-          GITHUB_TOKEN: ${{ secrets.Secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
           
