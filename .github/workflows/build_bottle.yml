@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # リリースを作成・編集する権限を付与
 
 jobs:
   build-and-release:
@@ -23,25 +23,22 @@ jobs:
       - name: Build bottle and get info
         id: bottle
         run: |
-          # brew bottle を実行し、JSONファイルが自動生成される
+          # bottleを生成し、JSONファイルも自動生成される
           brew bottle --json --no-rebuild ffmpeg-lgpl
 
           # 生成されたJSONファイルの名前を特定
           JSON_FILE=$(ls -1 *.json | head -n 1)
 
-          # デバッグ用にJSONファイルの内容をログに出力
-          echo "--- DEBUG: JSON file content ---"
-          cat "$JSON_FILE"
-
-          # JSONからバージョンとローカルファイル名を抽出
+          # JSONからバージョンとファイル名を抽出
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
           BOTTLE_FILENAME=$(jq -r '.[].bottle.tags.arm64_sequoia.local_filename' "$JSON_FILE")
-
+          
           # 後続のステップで利用できるよう、出力として設定
           echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
+          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT # JSONファイル名も出力に追加
 
-      - name: Create release and upload bottle
+      - name: Create release and upload assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -51,6 +48,7 @@ jobs:
             --title "ffmpeg-lgpl v${{ steps.bottle.outputs.FORMULA_VERSION }}" \
             --notes "New bottle for ffmpeg-lgpl."
           
-          # 作成したリリースにbottleファイルをアップロード
+          # 作成したリリースにbottleファイルとJSONファイルをアップロード
           gh release upload v${{ steps.bottle.outputs.FORMULA_VERSION }} \
-            "${{ steps.bottle.outputs.BOTTLE_FILENAME }}"
+            "${{ steps.bottle.outputs.BOTTLE_FILENAME }}" \
+            "${{ steps.bottle.outputs.JSON_FILENAME }}"
