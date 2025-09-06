@@ -11,20 +11,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Homebrew and tap
+      - name: Set up Homebrew, tap, and install formula
         run: |
           brew update --auto-update
           brew tap lgpl-dev/ffmpeg-lgpl
+          brew install ffmpeg-lgpl --build-bottle
 
-      - name: Install formula
-        run: brew install ffmpeg-lgpl --build-bottle
-
-      - name: Build and bottle formula
+      - name: Build bottle and get info
+        id: bottle
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-        run: brew bottle --json --no-rebuild ffmpeg-lgpl
+        run: |
+          # bottleを作成し、そのパスを環境変数に保存
+          brew bottle --json --no-rebuild ffmpeg-lgpl > ffmpeg-lgpl.json
+          # リリース情報（Formula名とバージョン）を抽出
+          BOTTLE_JSON=$(cat ffmpeg-lgpl.json)
+          FORMULA_NAME=$(echo "$BOTTLE_JSON" | jq -r '.[].formula.name')
+          FORMULA_VERSION=$(echo "$BOTTLE_JSON" | jq -r '.[].formula.pkg_version')
+          
+          echo "FORMULA_NAME=$FORMULA_NAME" >> $GITHUB_OUTPUT
+          echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Release bottle
+      - name: Create release
         env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-        run: brew release-pr --bottle --no-browse ffmpeg-lgpl.json
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # gh CLI を使用してGitHub Releasesを作成
+          # リリースのタグ、名前、ボディを設定
+          gh release create v${{ steps.bottle.outputs.FORMULA_VERSION }} \
+            --title "ffmpeg-lgpl v${{ steps.bottle.outputs.FORMULA_VERSION }}" \
+            --notes "New bottle for ffmpeg-lgpl."
+
+          # 作成したリリースにbottleファイルをアップロード
+          gh release upload v${{ steps.bottle.outputs.FORMULA_VERSION }} \
+            ffmpeg-lgpl--*.*.*.*.arm64_sonoma.bottle.tar.gz
