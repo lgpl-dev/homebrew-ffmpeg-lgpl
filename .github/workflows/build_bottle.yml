@@ -12,6 +12,7 @@ jobs:
       matrix:
         os: [macos-15, macos-14, macos-13]
         arch: [arm64, x86_64]
+        # x86_64はmacOS 15では対応していないため除外
         exclude:
           - os: macos-15
             arch: x86_64
@@ -28,13 +29,13 @@ jobs:
           brew tap lgpl-dev/ffmpeg-lgpl
 
       - name: Install formula
-        run: brew install ffmpeg-lgpl --build-bottle
+        run: brew install ffmpeg-lgpl --build-bottle --arch=${{ matrix.arch }}
 
       - name: Build bottle
         id: bottle
         run: |
           # brew bottleを実行し、JSONファイルとボトルファイルを生成
-          brew bottle --json --no-rebuild ffmpeg-lgpl
+          brew bottle --json --no-rebuild ffmpeg-lgpl --arch=${{ matrix.arch }}
           
           # 生成されたファイル名を特定
           JSON_FILE=$(ls -1 *.json | head -n 1)
@@ -48,7 +49,7 @@ jobs:
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
           echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
           echo "FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")" >> $GITHUB_OUTPUT
-
+          
       - name: Create or get release
         id: release
         env:
