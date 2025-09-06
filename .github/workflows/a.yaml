@@ -15,7 +15,6 @@ jobs:
         id: test_logic
         run: |
           # --- ダミーファイルの作成 ---
-          # 実際のボトルJSONファイルに近い構造でダミーファイルを作成
           cat > ffmpeg-lgpl--8.0_1.ventura.bottle.json << EOF
           {
             "lgpl-dev/ffmpeg-lgpl/ffmpeg-lgpl": {
@@ -65,7 +64,8 @@ jobs:
           if [[ "$BOTTLE_FILENAME" =~ ventura ]] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
             echo "--- 3. Correcting arm64 file names ---"
             
-            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*([a-z0-9_]+)\.bottle\.json/\1/')
+            # 修正: sedの正規表現でドットをエスケープ
+            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*\.([a-z0-9_]+)\.bottle\.json/\1/')
             echo "ORIGINAL_TAG: $ORIGINAL_TAG"
             
             NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
