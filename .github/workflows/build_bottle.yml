@@ -56,7 +56,6 @@ jobs:
 
           ARCH_TAG="${{ matrix.arch }}"
 
-          # x86_64のアーキテクチャタグをファイル名から除外するロジック
           if [ "$ARCH_TAG" == "arm64" ]; then
               ARCH_PREFIX="${ARCH_TAG}_"
           else
@@ -71,10 +70,10 @@ jobs:
           RELEASE_ASSETS=$(gh release view "$RELEASE_TAG" --json assets 2>/dev/null || true)
           
           if [[ "$RELEASE_ASSETS" == *"$FILE_NAME"* ]]; then
-            echo "::set-output name=skip::true"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "--- Bottle for this configuration already exists. Skipping build and upload. ---"
           else
-            echo "::set-output name=skip::false"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "--- Bottle does not exist. Proceeding with build. ---"
           fi
 
@@ -85,7 +84,7 @@ jobs:
             echo "--- Installing Homebrew for x86_64 ---"
             export PATH="/usr/local/bin:$PATH"
             arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            echo "/usr/local/bin" >> $GITHUB_PATH
+            echo "/usr/local/bin" >> "$GITHUB_PATH"
           else
             echo "--- Using default Homebrew for arm64 ---"
           fi
@@ -148,9 +147,9 @@ jobs:
           cat "$JSON_FILE"
           
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
-          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
-          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
-          echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
+          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> "$GITHUB_OUTPUT"
+          echo "JSON_FILENAME=$JSON_FILE" >> "$GITHUB_OUTPUT"
+          echo "FORMULA_VERSION=$FORMULA_VERSION" >> "$GITHUB_OUTPUT"
           
       - name: Create or get release
         if: steps.check_bottle.outputs.skip == 'false'
