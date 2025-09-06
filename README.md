@@ -1,5 +1,7 @@
 # ffmpeg-lgpl
 
+cf. https://github.com/Homebrew/homebrew-core/blob/main/Formula/f/ffmpeg.rb
+
 ### uninstall
 
 ```
