@@ -13,6 +13,12 @@ class FfmpegLgpl < Formula
   revision 1
   head "https://github.com/FFmpeg/FFmpeg.git", branch: "master"
 
+  # ここにbottleブロックを追加
+  bottle do
+    root_url "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1"
+    sha256 arm64_sequoia: "29b9786faf9ec7adb388f91ffb727df4184d09529346f53ef2cf27a5e9f237ad"
+  end
+
   livecheck do
     url "https://ffmpeg.org/download.html"
     regex(/href=.*?ffmpeg[._-]v?(\d+(?:\.\d+)+)\.t/i)
