@@ -16,11 +16,11 @@ class FfmpegLgpl < Formula
   # ここにbottleブロックを追加
   bottle do
     root_url "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1"
-    sha256 arm64_sequoia: "735087ec72844bddc3ee90346072bb507c91609a6b187c26e73579adeca4d592"    
-    sha256 arm64_sonoma:  "5d02281bf8260649eb927b0dea6167bb9c395e8a0afe371ebfc8f4d566a38887"
-    sha256 arm64_ventura: "9f01c8ade6eec6cdcc8bea4deeec0fae442efefa6d5f98f49431f49273199f80"
-    sha256 sonoma:        "9406f13ee066c70153d802ce14a0c46919340a672cda302debce6d5e2402a084"
-    sha256 ventura:       "060fe8d538f8a205a4cc0087c60797aef7bb6e0a91fcd0a0883e0b5e44dfd5c7"
+    sha256 arm64_sequoia: "76b6388755adbc890e02ff885fb03386b2fcbcd38c9ed2950eb33ab816cb7d6c"    
+    sha256 arm64_sonoma:  "f694163f5314440b127ea841f7bd236655035f7ec3d751fd461b55c8c2bed6c0"
+    sha256 arm64_ventura: "fbd5b558a8b74ae5ab97750a6d6ff5747c992fa52b5c30a9e4634ff0cda33dcc"
+    sha256 sonoma:        "08be9109fcdd54490ecf5585a86ffaec4de9c53384316680bf9b09c65f16293e"
+    sha256 ventura:       "de96ae91827f2b6bfa8bbdb0cb39b09c5bf38a00dd1279676f52fc0ee498a2fc"
   end
 
   livecheck do
