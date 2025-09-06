@@ -7,13 +7,16 @@ on:
         description: 'Formula to bottle (e.g., ffmpeg-lgpl)'
         required: true
         type: string
+      tag_name:
+        description: 'Tag name for the new release'
+        required: true
+        type: string
 
 jobs:
   build_and_upload_bottle:
     runs-on: macos-latest
     permissions:
       contents: write
-      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,53 +24,49 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Homebrew
-        id: setup-homebrew
         uses: Homebrew/actions/setup-homebrew@master
 
       - name: Build bottle
         run: |
-          brew bottle --json --no-rebuild ${{ github.event.inputs.formula_name }}
+          brew bottle --json ${{ github.event.inputs.formula_name }}
 
-      - name: Find bottle and JSON files
-        id: find_files
+      - name: Get paths of bottle and JSON files
+        id: get_paths
         run: |
           BOTTLE_FILE=$(find . -name "*.bottle.tar.gz")
           JSON_FILE=$(find . -name "*.json")
-          echo "::set-output name=bottle_path::$BOTTLE_FILE"
-          echo "::set-output name=json_path::$JSON_FILE"
-          echo "::set-output name=bottle_name::$(basename $BOTTLE_FILE)"
-          echo "::set-output name=json_name::$(basename $JSON_FILE)"
-          
-      - name: Get Release URL
+          echo "BOTTLE_PATH=$BOTTLE_FILE" >> $GITHUB_OUTPUT
+          echo "JSON_PATH=$JSON_FILE" >> $GITHUB_OUTPUT
+          echo "BOTTLE_NAME=$(basename $BOTTLE_FILE)" >> $GITHUB_OUTPUT
+          echo "JSON_NAME=$(basename $JSON_FILE)" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }} Bottles
-          body: This is a manual bottle upload.
+          tag_name: ${{ github.event.inputs.tag_name }}
+          release_name: ${{ github.event.inputs.tag_name }} Bottle
           draft: false
           prerelease: false
 
-      - name: Upload bottle to release
-        id: upload_bottle_asset
+      - name: Upload bottle asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.find_files.outputs.bottle_path }}
-          asset_name: ${{ steps.find_files.outputs.bottle_name }}
-          asset_content_type: application/gzip
+          asset_path: ${{ steps.get_paths.outputs.BOTTLE_PATH }}
+          asset_name: ${{ steps.get_paths.outputs.BOTTLE_NAME }}
+          asset_content_type: application/octet-stream
       
-      - name: Upload JSON to release
-        id: upload_json_asset
+      - name: Upload JSON asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.find_files.outputs.json_path }}
-          asset_name: ${{ steps.find_files.outputs.json_name }}
+          asset_path: ${{ steps.get_paths.outputs.JSON_PATH }}
+          asset_name: ${{ steps.get_paths.outputs.JSON_NAME }}
           asset_content_type: application/json
