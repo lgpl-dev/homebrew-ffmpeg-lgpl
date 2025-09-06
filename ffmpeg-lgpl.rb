@@ -1,3 +1,8 @@
+# typed: strict
+# frozen_string_literal: true
+
+# Homebrew formula for FFmpeg with only LGPL-compatible libraries enabled.
+# This formula provides a non-GPL, non-free version of FFmpeg.
 class FfmpegLgpl < Formula
   desc "Play, record, convert, and stream audio and video"
   homepage "https://ffmpeg.org/"
