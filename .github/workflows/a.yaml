@@ -16,9 +16,11 @@ jobs:
           FORMULA_NAME="ffmpeg-lgpl"
           FORMULA_FILE="ffmpeg-lgpl.rb"
           
-          # 問題のバージョンとリビジョンの抽出ロジック
-          FORMULA_VERSION=$(grep -E '^\s*version\s+"[^"]+"' "$FORMULA_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
-          FORMULA_REVISION=$(grep -E '^\s*revision\s+[0-9]+' "$FORMULA_FILE" | sed -E 's/.*revision\s+([0-9]+)/\1/')
+          # 修正したバージョン抽出ロジック
+          FORMULA_VERSION=$(grep -E '^\s*version\s+' "$FORMULA_FILE" | awk '{print $2}' | tr -d '"')
+          
+          # 修正したリビジョン抽出ロジック
+          FORMULA_REVISION=$(grep -E '^\s*revision\s+' "$FORMULA_FILE" | awk '{print $2}')
           
           # リビジョンが取得できない場合は0と見なす
           if [[ -z "$FORMULA_REVISION" ]]; then
