@@ -19,19 +19,26 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Check for existing bottle on release
         id: check_bottle
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FORMULA_NAME="ffmpeg-lgpl"
+          FORMULA_FILE="ffmpeg-lgpl.rb"
           
-          # brew infoコマンドの出力からバージョンとリビジョンを正確に取得
-          FORMULA_INFO=$(brew info --json "$FORMULA_NAME")
-          FORMULA_VERSION=$(echo "$FORMULA_INFO" | jq -r '.[0].versions.stable')
+          # フォーミュラファイルからバージョン情報を直接取得
+          FORMULA_VERSION=$(grep -E '^\s*version\s+"[^"]+"' "$FORMULA_FILE" | sed -E 's/.*"([^"]+)".*/\1/' | sed -E 's/_.*//')
+          FORMULA_REVISION=$(grep -E '^\s*revision\s+[0-9]+' "$FORMULA_FILE" | sed -E 's/.*revision\s+([0-9]+)/\1/')
           
-          # リビジョンが0の場合は無視
-          FORMULA_REVISION=$(echo "$FORMULA_INFO" | jq -r '.[0].versions.revision')
+          # リビジョンが取得できない場合は0と見なす
+          if [[ -z "$FORMULA_REVISION" ]]; then
+            FORMULA_REVISION="0"
+          fi
+
           if [ "$FORMULA_REVISION" == "0" ]; then
             RELEASE_TAG="v$FORMULA_VERSION"
           else
@@ -39,17 +46,14 @@ jobs:
           fi
           
           # ビルドするボトルファイルの予測名を作成
-          # macOS 13 (ventura) の arm64 ボトルは特別な命名規則
           if [ "${{ matrix.os }}" == "macos-13" ] && [ "${{ matrix.arch }}" == "arm64" ]; then
             FILE_NAME="${FORMULA_NAME}-${FORMULA_VERSION}_${FORMULA_REVISION}.arm64_ventura.bottle.tar.gz"
           else
-            # 他のOS/アーキテクチャの組み合わせに対応
             OS_TAG=$(echo "${{ matrix.os }}" | sed 's/macos-//')
             ARCH_TAG="${{ matrix.arch }}"
             FILE_NAME="${FORMULA_NAME}-${FORMULA_VERSION}_${FORMULA_REVISION}.${ARCH_TAG}_${OS_TAG}.bottle.tar.gz"
           fi
           
-          # `--` を `-` に修正
           FILE_NAME=$(echo "$FILE_NAME" | sed 's/--/-/g')
           echo "Expected file: $FILE_NAME"
 
@@ -63,10 +67,6 @@ jobs:
             echo "::set-output name=skip::false"
             echo "--- Bottle does not exist. Proceeding with build. ---"
           fi
-
-      - name: Checkout repository
-        if: steps.check_bottle.outputs.skip == 'false'
-        uses: actions/checkout@v4
 
       - name: Set up Homebrew for ${{ matrix.arch }}
         if: steps.check_bottle.outputs.skip == 'false'
@@ -104,7 +104,6 @@ jobs:
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
 
-          # --- ハイフン `--` を `-` に修正するロジック ---
           NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
           if [ "$BOTTLE_FILENAME" != "$NEW_BOTTLE_FILENAME" ]; then
             echo "--- Renaming bottle file from '$BOTTLE_FILENAME' to '$NEW_BOTTLE_FILENAME' ---"
@@ -118,7 +117,6 @@ jobs:
             jq '.[].bottle.tags[] |= if .local_filename? then .local_filename |= sub("--"; "-") else . end' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
 
-          # --- macOS 13 (ventura) の arm64 ボトルファイル名を修正するロジック ---
           if [ "${{ matrix.os }}" == "macos-13" ] && [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
             echo "--- Correcting arm64 bottle file names ---"
             
@@ -135,6 +133,9 @@ jobs:
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
               '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
+
+          echo "--- DEBUG: JSON file content ---"
+          cat "$JSON_FILE"
           
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
@@ -149,7 +150,6 @@ jobs:
         run: |
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "${{ steps.bottle.outputs.JSON_FILENAME }}")
           
-          # リビジョンが0の場合はvX.Y、それ以外はvX.Y_Zの形式にする
           if [[ "$FORMULA_VERSION" == *_* ]]; then
             RELEASE_TAG="v$FORMULA_VERSION"
           else
@@ -171,7 +171,6 @@ jobs:
         run: |
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "${{ steps.bottle.outputs.JSON_FILENAME }}")
           
-          # リビジョンが0の場合はvX.Y、それ以外はvX.Y_Zの形式にする
           if [[ "$FORMULA_VERSION" == *_* ]]; then
             RELEASE_TAG="v$FORMULA_VERSION"
           else
