@@ -55,39 +55,57 @@ jobs:
           JSON_FILE=$(ls -1 *.json | head -n 1)
           BOTTLE_FILENAME=$(ls -1 *.tar.gz | head -n 1)
 
-          # arm64アーキテクチャなのにファイル名にarm64が含まれていない場合に修正
+          # --- ハイフン `--` を修正するロジック ---
+          NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/--/-/g')
+          if [ "$BOTTLE_FILENAME" != "$NEW_BOTTLE_FILENAME" ]; then
+            echo "--- Renaming bottle file from '$BOTTLE_FILENAME' to '$NEW_BOTTLE_FILENAME' ---"
+            mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
+            BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
+            
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/--/-/g')
+            mv "$JSON_FILE" "$NEW_JSON_FILE"
+            JSON_FILE=$NEW_JSON_FILE
+
+            jq '.[].bottle.tags[][].local_filename |= sub("--"; "-")' "$JSON_FILE" > temp.json
+            mv temp.json "$JSON_FILE"
+          fi
+          # --- ここまで修正ロジック ---
+
+          # ファイル名にarm64が含まれていない場合に修正
           if [ "${{ matrix.arch }}" == "arm64" ] && [[ ! "$BOTTLE_FILENAME" =~ arm64 ]]; then
             echo "--- Correcting arm64 bottle file names ---"
             
+            # 元のタグ名を取得
+            ORIGINAL_TAG=$(echo "$JSON_FILE" | sed -E 's/.*([a-z0-9_]+)\.bottle\.json/\1/')
+            
             # ボトルファイル名を修正
-            NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed 's/\.bottle\.tar\.gz$/\.arm64_ventura\.bottle\.tar\.gz/')
+            NEW_BOTTLE_FILENAME=$(echo "$BOTTLE_FILENAME" | sed "s/\.${ORIGINAL_TAG}\.bottle\.tar\.gz$/\.arm64_${ORIGINAL_TAG}\.bottle\.tar\.gz/")
             mv "$BOTTLE_FILENAME" "$NEW_BOTTLE_FILENAME"
             BOTTLE_FILENAME=$NEW_BOTTLE_FILENAME
             
             # JSONファイル名を修正
-            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed 's/\.bottle\.json$/\.arm64_ventura\.bottle\.json/')
+            NEW_JSON_FILE=$(echo "$JSON_FILE" | sed "s/\.${ORIGINAL_TAG}\.bottle\.json$/\.arm64_${ORIGINAL_TAG}\.bottle\.json/")
             mv "$JSON_FILE" "$NEW_JSON_FILE"
             JSON_FILE=$NEW_JSON_FILE
             
-            # JSONファイル内のURLとタグも修正
-            jq '.[] |= .bottle.tags.arm64_ventura = (.bottle.tags | .[] | .)' "$JSON_FILE" > temp.json
-            jq '.[].bottle.tags.arm64_ventura.local_filename = "'"$NEW_BOTTLE_FILENAME"'"' temp.json > temp2.json
-            mv temp2.json "$JSON_FILE"
-            rm temp.json
+            # JSONファイル内のタグを修正
+            jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
+              '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json
+            mv temp.json "$JSON_FILE"
           fi
 
           echo "--- DEBUG: JSON file content ---"
           cat "$JSON_FILE"
           
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
-          echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
-          echo "JSON_FILENAME=$JSON_FILE" >> $GITHUB_OUTPUT
+          echo "BOTTLE_FILENAME=$BOTTLE_OUTPUT_NAME" >> $GITHUB_OUTPUT
+          echo "JSON_FILENAME=$JSON_OUTPUT_NAME" >> $GITHUB_OUTPUT
           echo "FORMULA_VERSION=$FORMULA_VERSION" >> $GITHUB_OUTPUT
           
       - name: Create or get release
         id: release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
           RELEASE_INFO=$(gh release view v"$FORMULA_VERSION" --json url 2>/dev/null || true)
@@ -100,7 +118,7 @@ jobs:
           
       - name: Upload assets to release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FORMULA_VERSION=${{ steps.bottle.outputs.FORMULA_VERSION }}
           
