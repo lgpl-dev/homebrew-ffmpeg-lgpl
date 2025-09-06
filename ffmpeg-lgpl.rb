@@ -23,8 +23,8 @@ class FfmpegLgpl < Formula
     root_url "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1"
     sha256 arm64_sequoia: "902430338339abf0ae82a60268e5c5fae4ab623f01d1050b3eec8773fa928d91"    
     sha256 arm64_sonoma:  "22bbbe0eb3014af09772c29416750ab70226a6a9783545687a2979dc3235bd7a"
-    sha256 arm64_ventura: "060fe8d538f8a205a4cc0087c60797aef7bb6e0a91fcd0a0883e0b5e44dfd5c7"
-    sha256 sonoma:        ""
+    sha256 arm64_ventura: "9f01c8ade6eec6cdcc8bea4deeec0fae442efefa6d5f98f49431f49273199f80"
+    sha256 sonoma:        "9406f13ee066c70153d802ce14a0c46919340a672cda302debce6d5e2402a084"
     sha256 ventura:       "060fe8d538f8a205a4cc0087c60797aef7bb6e0a91fcd0a0883e0b5e44dfd5c7"
   end
 
