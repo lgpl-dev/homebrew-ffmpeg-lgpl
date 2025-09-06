@@ -55,8 +55,15 @@ jobs:
           fi
 
           ARCH_TAG="${{ matrix.arch }}"
+
+          # x86_64のアーキテクチャタグをファイル名から除外するロジック
+          if [ "$ARCH_TAG" == "arm64" ]; then
+              ARCH_PREFIX="${ARCH_TAG}_"
+          else
+              ARCH_PREFIX=""
+          fi
           
-          FILE_NAME="${FORMULA_NAME}-${FORMULA_VERSION}_${FORMULA_REVISION}.${ARCH_TAG}_${OS_TAG}.bottle.tar.gz"
+          FILE_NAME="${FORMULA_NAME}-${FORMULA_VERSION}_${FORMULA_REVISION}.${ARCH_PREFIX}${OS_TAG}.bottle.tar.gz"
           FILE_NAME=$(echo "$FILE_NAME" | sed 's/--/-/g')
           
           echo "Expected file: $FILE_NAME"
@@ -136,6 +143,9 @@ jobs:
             jq --arg original "$ORIGINAL_TAG" --arg new "arm64_${ORIGINAL_TAG}" \
               '.[] |= (.bottle.tags[$new] = .bottle.tags[$original] | del(.bottle.tags[$original]))' "$JSON_FILE" > temp.json && mv temp.json "$JSON_FILE" || true
           fi
+
+          echo "--- DEBUG: JSON file content ---"
+          cat "$JSON_FILE"
           
           FORMULA_VERSION=$(jq -r '.[].formula.pkg_version' "$JSON_FILE")
           echo "BOTTLE_FILENAME=$BOTTLE_FILENAME" >> $GITHUB_OUTPUT
