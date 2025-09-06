@@ -8,32 +8,16 @@ jobs:
     runs-on: macos-14
 
     steps:
-      - name: Create dummy formula file
-        run: |
-          cat << 'EOF' > ffmpeg-lgpl.rb
-          class FfmpegLgpl < Formula
-            desc "FFmpeg with LGPL license"
-            homepage "https://ffmpeg.org/"
-            url "https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.gz"
-            version "6.1.1"
-            revision 1
-            license "LGPL-2.1-or-later"
-          
-            def install
-              # ...
-            end
-          end
-          EOF
-          
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Run debug script
         run: |
           FORMULA_NAME="ffmpeg-lgpl"
           FORMULA_FILE="ffmpeg-lgpl.rb"
           
-          # バージョンを抽出するロジック
+          # 問題のバージョンとリビジョンの抽出ロジック
           FORMULA_VERSION=$(grep -E '^\s*version\s+"[^"]+"' "$FORMULA_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
-          
-          # リビジョンを抽出するロジック
           FORMULA_REVISION=$(grep -E '^\s*revision\s+[0-9]+' "$FORMULA_FILE" | sed -E 's/.*revision\s+([0-9]+)/\1/')
           
           # リビジョンが取得できない場合は0と見なす
@@ -45,6 +29,3 @@ jobs:
           echo "### Debugging Output ###"
           echo "FORMULA_VERSION: '$FORMULA_VERSION'"
           echo "FORMULA_REVISION: '$FORMULA_REVISION'"
-          
-          # -- 後処理 --
-          rm ffmpeg-lgpl.rb
