@@ -13,7 +13,11 @@ class FfmpegLgpl < Formula
   revision 1
   head "https://github.com/FFmpeg/FFmpeg.git", branch: "master"
 
-  # ここにbottleブロックを追加
+  livecheck do
+    url "https://ffmpeg.org/download.html"
+    regex(/href=.*?ffmpeg[._-]v?(\d+(?:\.\d+)+)\.t/i)
+  end
+
   bottle do
     root_url "https://github.com/lgpl-dev/homebrew-ffmpeg-lgpl/releases/download/v8.0_1"
     sha256 arm64_sequoia: "76b6388755adbc890e02ff885fb03386b2fcbcd38c9ed2950eb33ab816cb7d6c"    
@@ -21,11 +25,6 @@ class FfmpegLgpl < Formula
     sha256 arm64_ventura: "fbd5b558a8b74ae5ab97750a6d6ff5747c992fa52b5c30a9e4634ff0cda33dcc"
     sha256 sonoma:        "08be9109fcdd54490ecf5585a86ffaec4de9c53384316680bf9b09c65f16293e"
     sha256 ventura:       "de96ae91827f2b6bfa8bbdb0cb39b09c5bf38a00dd1279676f52fc0ee498a2fc"
-  end
-
-  livecheck do
-    url "https://ffmpeg.org/download.html"
-    regex(/href=.*?ffmpeg[._-]v?(\d+(?:\.\d+)+)\.t/i)
   end
 
   depends_on "pkgconf" => :build
@@ -37,6 +36,8 @@ class FfmpegLgpl < Formula
   depends_on "libass"
   depends_on "libssh"
   depends_on "libvmaf"
+  depends_on "libx11"
+  depends_on "libxcb"
   depends_on "libvorbis"
   depends_on "openjpeg"
   depends_on "opus"
@@ -55,8 +56,6 @@ class FfmpegLgpl < Formula
 
   on_linux do
     depends_on "alsa-lib"
-    depends_on "libx11"
-    depends_on "libxcb"
     depends_on "libxext"
     depends_on "libxv"
   end
