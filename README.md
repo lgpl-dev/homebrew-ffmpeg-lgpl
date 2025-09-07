@@ -1,5 +1,3 @@
-I can do that. Here's the README in English.
-
 # 🚀 Homebrew LGPL FFmpeg
 
 This repository provides a Homebrew formula for an LGPL-licensed version of FFmpeg. While the official Homebrew core version includes GPL-licensed components, this tap offers a build that adheres to the LGPL license, making it a great choice for projects with LGPL requirements.
