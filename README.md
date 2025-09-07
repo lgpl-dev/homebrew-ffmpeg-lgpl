@@ -15,3 +15,13 @@ brew untap lgpl-dev/ffmpeg-lgpl
 brew tap lgpl-dev/ffmpeg-lgpl
 brew install ffmpeg-lgpl
 ```
+
+### pathch
+
+```
+diff -u ffmpeg.rb ffmpeg-lgpl.rb > gpl2lgpl.patch
+```
+
+```
+patch -o ffmpeg-lgpl.rb ffmpeg.rb gpl2lgpl.patch
+```
